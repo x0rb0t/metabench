@@ -45,6 +45,24 @@ Convert to JSON format with ages grouped by decade
 
 As complexity increases, instructions become multi-layered with conditional logic, cross-references, and validation requirements.
 
+## Architecture
+
+MetaBench is built with a modular architecture for maintainability and extensibility:
+
+### Core Modules
+
+- **`main.py`** - Entry point with CLI handling and main execution flow
+- **`modules/benchmark.py`** - Main benchmark orchestration and execution logic
+- **`modules/config.py`** - Configuration data classes and validation
+- **`modules/cli.py`** - Command-line argument parsing and interactive mode
+- **`modules/llm.py`** - LLM wrapper with retry logic and error handling
+- **`modules/generators.py`** - Content and instruction generation engines
+- **`modules/engines.py`** - Transformation and verification engines
+- **`modules/parsers.py`** - Custom output parsers for structured responses
+- **`modules/utils.py`** - Utility functions (env resolution, logging setup)
+
+This modular design allows for easy testing, modification, and extension of individual components without affecting the entire system.
+
 ## Features
 
 - **🎯 Enhanced Instruction Generation**: Creates diverse transformation instructions with varying complexity levels (1-5)
@@ -219,7 +237,7 @@ Total Time: 67.2s
 
 ### Programmatic Configuration
 ```python
-from main import BenchmarkConfig, TransformationBenchmark
+from modules import BenchmarkConfig, TransformationBenchmark
 
 config = BenchmarkConfig(
     base_url="http://localhost:1234/v1",
@@ -390,14 +408,24 @@ ls -la logs/
 
 ```
 metabench/
-├── main.py              # Complete benchmark implementation
-├── pyproject.toml       # uv project configuration
-├── README.md           # This documentation
-├── .gitignore          # Git ignore rules
-├── uv.lock            # Dependency lock file
-└── logs/              # Auto-created benchmark logs
-    ├── benchmark_log_*.log
-└── benchmark_results/  # Auto-created benchmark results
+├── main.py                   # Main entry point and CLI interface
+├── pyproject.toml           # uv project configuration
+├── README.md               # This documentation
+├── .gitignore              # Git ignore rules
+├── uv.lock                # Dependency lock file
+├── modules/               # Modular components
+│   ├── __init__.py        # Module exports and package definition
+│   ├── benchmark.py       # Main benchmark runner class
+│   ├── cli.py            # CLI argument parsing and interactive mode
+│   ├── config.py         # Configuration classes and validation
+│   ├── engines.py        # Transformation and verification engines
+│   ├── generators.py     # Content and instruction generators
+│   ├── llm.py           # LLM wrapper functionality
+│   ├── parsers.py       # Custom output parsers
+│   └── utils.py         # Environment variable resolution and utilities
+├── logs/                 # Auto-created benchmark logs
+│   └── benchmark_log_*.log
+└── results/             # Auto-created benchmark results
     └── benchmark_results_*.json
 ```
 
