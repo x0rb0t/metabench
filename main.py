@@ -21,6 +21,35 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser, BaseOutputParser
 import re
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+###############################################################################
+# Environment Variable Resolution
+###############################################################################
+
+def resolve_env_var(value: str) -> str:
+    """
+    Resolve environment variable if value starts with 'env:'.
+    
+    Args:
+        value: String that may be in format 'env:VARIABLE_NAME' or regular value
+        
+    Returns:
+        Resolved environment variable value or original value
+        
+    Raises:
+        ValueError: If environment variable is not found
+    """
+    if value.startswith('env:'):
+        env_var_name = value[4:]  # Remove 'env:' prefix
+        env_value = os.getenv(env_var_name)
+        if env_value is None:
+            raise ValueError(f"Environment variable '{env_var_name}' is not set")
+        return env_value
+    return value
 
 ###############################################################################
 # Logging Setup
@@ -1156,9 +1185,28 @@ def interactive_mode():
     
     # Model configuration
     print("\n🤖 Model Configuration:")
-    config.base_url = input(f"Base URL [{config.base_url}]: ").strip() or config.base_url
+    print("💡 Tip: Use 'env:VARIABLE_NAME' to reference environment variables")
+    print("📝 Example: env:OPENROUTER_API_KEY")
+    
+    base_url_input = input(f"Base URL [{config.base_url}]: ").strip() or config.base_url
+    try:
+        config.base_url = resolve_env_var(base_url_input)
+        if base_url_input.startswith('env:'):
+            print(f"✅ Resolved environment variable to: {config.base_url}")
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        config.base_url = base_url_input
+    
     api_key_input = getpass.getpass(f"API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
-    config.api_key = api_key_input or config.api_key
+    if api_key_input:
+        try:
+            config.api_key = resolve_env_var(api_key_input)
+            if api_key_input.startswith('env:'):
+                print(f"✅ Resolved environment variable for API key")
+        except ValueError as e:
+            print(f"❌ Error: {e}")
+            config.api_key = api_key_input
+    
     config.model_name = input("Model name (leave empty for local): ").strip()
     
     # Benchmark configuration
@@ -1227,11 +1275,23 @@ Examples:
   # Full benchmark with specific model
   python benchmark.py --model gpt-3.5-turbo --url https://api.openai.com/v1
   
+  # Using OpenRouter with environment variables
+  python benchmark.py --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL --model anthropic/claude-3-sonnet
+  
+  # Using environment variables (set first: export OPENROUTER_API_KEY=your_key)
+  python benchmark.py --api-key env:OPENROUTER_API_KEY --url https://openrouter.ai/api/v1
+  
   # Topic-focused benchmark with logging
   python benchmark.py --topic "blockchain" --content code,text --log-file blockchain_test.log
   
   # Interactive mode
   python benchmark.py --interactive
+
+Environment Variables:
+  You can reference environment variables using the 'env:' prefix:
+  --api-key env:OPENROUTER_API_KEY    # Uses $OPENROUTER_API_KEY
+  --url env:OPENROUTER_BASE_URL       # Uses $OPENROUTER_BASE_URL
+  --api-key env:OPENAI_API_KEY        # Uses $OPENAI_API_KEY
         """
     )
     
@@ -1240,8 +1300,10 @@ Examples:
     parser.add_argument('--quick', '-q', action='store_true', help='Quick benchmark (2 complexity levels, 1 trial each)')
     
     # Model configuration
-    parser.add_argument('--url', '--base-url', default="http://localhost:1234/v1", help='Base URL for the LLM API')
-    parser.add_argument('--api-key', default="not-needed", help='API key for the LLM service')
+    parser.add_argument('--url', '--base-url', default="http://localhost:1234/v1", 
+                       help='Base URL for the LLM API (supports env:VARIABLE_NAME format)')
+    parser.add_argument('--api-key', default="not-needed", 
+                       help='API key for the LLM service (supports env:VARIABLE_NAME format, e.g., env:OPENROUTER_API_KEY)')
     parser.add_argument('--model', '--model-name', default="", help='Model name (leave empty for local models)')
     parser.add_argument('--creative-model', default="", help='Specific model for creative content generation')
     parser.add_argument('--structured-model', default="", help='Specific model for structured tasks')
@@ -1272,10 +1334,20 @@ def main():
     if args.interactive:
         return interactive_mode()
     
+    # Resolve environment variables for API key and base URL
+    try:
+        resolved_api_key = resolve_env_var(args.api_key)
+        resolved_base_url = resolve_env_var(args.url)
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        print("💡 Tip: Use 'env:VARIABLE_NAME' to reference environment variables")
+        print("📝 Example: --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL")
+        return 1
+    
     # Create configuration
     config = BenchmarkConfig(
-        base_url=args.url,
-        api_key=args.api_key,
+        base_url=resolved_base_url,
+        api_key=resolved_api_key,
         model_name=args.model,
         creative_model=args.creative_model,
         structured_model=args.structured_model,

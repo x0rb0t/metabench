@@ -236,11 +236,32 @@ summary = benchmark.run_benchmark()
 ```
 
 ### Environment Variables
+
+You can reference environment variables using the `env:` prefix in command-line arguments:
+
 ```bash
-export METABENCH_API_KEY="your-api-key"
-export METABENCH_BASE_URL="https://api.openai.com/v1"
-export METABENCH_MODEL="gpt-4"
+# Set environment variables
+export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+export OPENAI_API_KEY="sk-your-openai-key"
+
+# Reference them with env: prefix
+uv run main.py --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL --model "deepseek/deepseek-r1"
+uv run main.py --api-key env:OPENAI_API_KEY --url "https://api.openai.com/v1" --model "gpt-4"
 ```
+
+You can also use a `.env` file (automatically loaded):
+```bash
+# .env file
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_API_KEY=sk-your-openai-key
+```
+
+**Supported environment variable formats:**
+- `--api-key env:OPENROUTER_API_KEY` - Uses `$OPENROUTER_API_KEY`
+- `--url env:OPENROUTER_BASE_URL` - Uses `$OPENROUTER_BASE_URL`
+- `--api-key env:OPENAI_API_KEY` - Uses `$OPENAI_API_KEY`
 
 ## Understanding Complexity Levels
 
