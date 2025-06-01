@@ -6,6 +6,45 @@ A sophisticated benchmarking tool that evaluates LLM performance on content tran
 
 MetaBench challenges language models with increasingly complex transformation tasks - from simple format conversions to multi-layered data restructuring with conditional logic. It generates creative content, applies sophisticated transformation instructions, and provides detailed scoring on how well the LLM follows complex, multi-step requirements.
 
+## How It Works
+
+MetaBench follows a simple 4-step process for each trial:
+
+1. **Generate Content** → 2. **Create Instructions** → 3. **Transform** → 4. **Score**
+
+### Toy Example
+
+**Step 1: Generate Content**
+```
+Original content: "Alice: 25, Bob: 30, Carol: 28"
+```
+
+**Step 2: Create Transformation Instructions**
+```
+Convert to JSON format with ages grouped by decade
+```
+
+**Step 3: LLM Transforms**
+```json
+{
+  "twenties": [
+    {"name": "Alice", "age": 25},
+    {"name": "Carol", "age": 28}
+  ],
+  "thirties": [
+    {"name": "Bob", "age": 30}
+  ]
+}
+```
+
+**Step 4: Score the Result**
+- ✅ Followed JSON format: 10/10
+- ✅ Grouped by decade correctly: 10/10  
+- ✅ Preserved all data: 10/10
+- **Final Score: 10/10**
+
+As complexity increases, instructions become multi-layered with conditional logic, cross-references, and validation requirements.
+
 ## Features
 
 - **🎯 Enhanced Instruction Generation**: Creates diverse transformation instructions with varying complexity levels (1-5)
