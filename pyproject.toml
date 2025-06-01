@@ -1,7 +1,7 @@
 [project]
 name = "metabench"
 version = "0.1.0"
-description = "Add your description here"
+description = "A sophisticated benchmarking tool that evaluates LLM performance on content transformation tasks with enhanced instruction diversity, creative content generation, proper scoring logic, and comprehensive logging."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
