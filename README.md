@@ -31,7 +31,57 @@ uv run main.py --quick
 
 ## Installation
 
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management:
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management. If you don't have uv installed, choose one of the methods below:
+
+### Installing uv
+
+#### Standalone Installer (Recommended)
+
+**macOS and Linux:**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Windows:**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+#### Alternative Installation Methods
+
+**Homebrew (macOS):**
+```bash
+brew install uv
+```
+
+**PyPI (with pipx):**
+```bash
+pipx install uv
+```
+
+**PyPI (with pip):**
+```bash
+pip install uv
+```
+
+**WinGet (Windows):**
+```bash
+winget install --id=astral-sh.uv -e
+```
+
+**Scoop (Windows):**
+```bash
+scoop install main/uv
+```
+
+**Cargo:**
+```bash
+cargo install --git https://github.com/astral-sh/uv uv
+```
+
+### Setting up the Project
+
+Once uv is installed:
 
 ```bash
 # Install dependencies
