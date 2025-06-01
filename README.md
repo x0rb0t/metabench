@@ -216,21 +216,54 @@ export METABENCH_MODEL="gpt-4"
 ## CLI Reference
 
 ```bash
-uv run main.py [OPTIONS]
+% uv run main.py --help
+usage: main.py [-h] [--interactive] [--quick] [--url URL] [--api-key API_KEY] [--model MODEL] [--creative-model CREATIVE_MODEL]
+               [--structured-model STRUCTURED_MODEL] [--transform-model TRANSFORM_MODEL] [--complexity COMPLEXITY] [--trials TRIALS]
+               [--temperature TEMPERATURE] [--content CONTENT] [--topic TOPIC] [--output OUTPUT] [--log-file LOG_FILE] [--quiet]
 
-Options:
-  -i, --interactive          Run in interactive mode
-  -q, --quick               Quick benchmark (2 levels, 1 trial each)
-  --url TEXT                Base URL for LLM API
-  --api-key TEXT            API key for LLM service
-  --model TEXT              Model name
-  --complexity INTEGER      Maximum complexity level (1-5)
-  --trials INTEGER          Number of trials per complexity
-  --content TEXT            Content types: code,text,data,configuration,documentation
-  --topic TEXT              Topic for content generation
-  --temperature FLOAT       Temperature for LLM (0.0-2.0)
-  --output TEXT             Output filename for results
-  --log-file TEXT           Log filename
+Enhanced Self-Evaluating Transformation Benchmark
+
+options:
+  -h, --help            show this help message and exit
+  --interactive, -i     Run in interactive mode
+  --quick, -q           Quick benchmark (2 complexity levels, 1 trial each)
+  --url URL, --base-url URL
+                        Base URL for the LLM API
+  --api-key API_KEY     API key for the LLM service
+  --model MODEL, --model-name MODEL
+                        Model name (leave empty for local models)
+  --creative-model CREATIVE_MODEL
+                        Specific model for creative content generation
+  --structured-model STRUCTURED_MODEL
+                        Specific model for structured tasks
+  --transform-model TRANSFORM_MODEL
+                        Specific model for transformations
+  --complexity COMPLEXITY, --max-complexity COMPLEXITY
+                        Maximum complexity level (1-5)
+  --trials TRIALS, --trials-per-complexity TRIALS
+                        Number of trials per complexity level
+  --temperature TEMPERATURE
+                        Base temperature for LLM
+  --content CONTENT, --content-types CONTENT
+                        Comma-separated list of content types
+  --topic TOPIC         Topic for content generation (makes content topic-specific)
+  --output OUTPUT, -o OUTPUT
+                        Output filename for results (auto-generated if not specified)
+  --log-file LOG_FILE   Log filename (auto-generated if not specified)
+  --quiet               Reduce output verbosity
+
+Examples:
+  # Quick test with local model
+  python benchmark.py --quick
+  
+  # Full benchmark with specific model
+  python benchmark.py --model gpt-3.5-turbo --url https://api.openai.com/v1
+  
+  # Topic-focused benchmark with logging
+  python benchmark.py --topic "blockchain" --content code,text --log-file blockchain_test.log
+  
+  # Interactive mode
+  python benchmark.py --interactive
 ```
 
 ## Output Files
