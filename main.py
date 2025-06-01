@@ -39,7 +39,7 @@ def main():
         api_key=resolved_api_key,
         model_name=args.model,
         creative_model=args.creative_model,
-        structured_model=args.structured_model,
+        verification_model=args.verification_model,
         transform_model=args.transform_model,
         temperature=args.temperature,
         topic=args.topic,

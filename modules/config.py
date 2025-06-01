@@ -3,7 +3,7 @@ Configuration classes and validation functions.
 """
 
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 
 
 def sanitize_config_for_logging(config: "BenchmarkConfig") -> Dict[str, Any]:
@@ -49,6 +49,15 @@ def validate_config(config: "BenchmarkConfig") -> List[str]:
     if config.temperature < 0.0 or config.temperature > 2.0:
         issues.append("temperature must be between 0.0 and 2.0")
     
+    if config.max_retries < 1:
+        issues.append("max_retries must be at least 1")
+    
+    if config.verification_attempts < 1:
+        issues.append("verification_attempts must be at least 1")
+    
+    if config.verification_aggregation not in ['best', 'avg', 'worst']:
+        issues.append("verification_aggregation must be 'best', 'avg', or 'worst'")
+    
     # Validate content types
     valid_content_types = {"code", "text", "data", "configuration", "documentation"}
     invalid_types = set(config.content_types) - valid_content_types
@@ -61,22 +70,49 @@ def validate_config(config: "BenchmarkConfig") -> List[str]:
 @dataclass
 class BenchmarkConfig:
     """Configuration for the benchmark run"""
+    # Default base URLs
     base_url: str = "http://localhost:1234/v1"
+    creative_base_url: str = ""  # If empty, uses base_url
+    verification_base_url: str = ""  # If empty, uses base_url
+    transform_base_url: str = ""  # If empty, uses base_url
+    
+    # API configuration
     api_key: str = "not-needed"
     temperature: float = 0.3
+    
+    # Model configuration
+    model_name: str = ""
+    creative_model: str = ""
+    verification_model: str = ""
+    transform_model: str = ""
+    
+    # Benchmark configuration
     max_complexity: int = 5
     trials_per_complexity: int = 3
     content_types: List[str] = None
     topic: Optional[str] = None
-    model_name: str = ""
-    creative_model: str = ""
-    structured_model: str = ""
-    transform_model: str = ""
+    
+    # Retry configuration
+    max_retries: int = 3
+    
+    # Verification configuration
+    verification_attempts: int = 1
+    verification_aggregation: Literal['best', 'avg', 'worst'] = 'avg'
+    
+    # Logging configuration
     log_file: str = None
     
     def __post_init__(self):
         if self.content_types is None:
             self.content_types = ["code", "text", "data", "configuration", "documentation"]
+        
+        # Set default base URLs if not specified
+        if not self.creative_base_url:
+            self.creative_base_url = self.base_url
+        if not self.verification_base_url:
+            self.verification_base_url = self.base_url
+        if not self.transform_base_url:
+            self.transform_base_url = self.base_url
 
 
 @dataclass
@@ -93,6 +129,17 @@ class BenchmarkResult:
     errors: List[str]
     content_variations: List[str]
     specific_scores: Dict[str, float]
+    
+    # New retry-related fields
+    content_generation_attempts: int = 1
+    instruction_generation_attempts: int = 1
+    transformation_attempts: int = 1
+    verification_attempts: int = 1
+    verification_scores: List[float] = None  # All verification scores when multiple attempts
+    
+    def __post_init__(self):
+        if self.verification_scores is None:
+            self.verification_scores = [self.verification_score]
 
 
 @dataclass
@@ -105,3 +152,9 @@ class BenchmarkSummary:
     completion_rates_by_complexity: Dict[int, float]
     error_rate: float
     total_time: float
+    
+    # New retry-related summary fields
+    average_content_attempts: float = 1.0
+    average_instruction_attempts: float = 1.0
+    average_transformation_attempts: float = 1.0
+    average_verification_attempts: float = 1.0

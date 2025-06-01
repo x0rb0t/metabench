@@ -296,7 +296,7 @@ OPENAI_API_KEY=sk-your-openai-key
 ```bash
 % uv run main.py --help
 usage: main.py [-h] [--interactive] [--quick] [--url URL] [--api-key API_KEY] [--model MODEL] [--creative-model CREATIVE_MODEL]
-               [--structured-model STRUCTURED_MODEL] [--transform-model TRANSFORM_MODEL] [--complexity COMPLEXITY] [--trials TRIALS]
+               [--verification-model VERIFICATION_MODEL] [--transform-model TRANSFORM_MODEL] [--complexity COMPLEXITY] [--trials TRIALS]
                [--temperature TEMPERATURE] [--content CONTENT] [--topic TOPIC] [--output OUTPUT] [--log-file LOG_FILE] [--quiet]
 
 Enhanced Self-Evaluating Transformation Benchmark
@@ -312,8 +312,8 @@ options:
                         Model name (leave empty for local models)
   --creative-model CREATIVE_MODEL
                         Specific model for creative content generation
-  --structured-model STRUCTURED_MODEL
-                        Specific model for structured tasks
+  --verification-model VERIFICATION_MODEL
+                        Specific model for verification tasks
   --transform-model TRANSFORM_MODEL
                         Specific model for transformations
   --complexity COMPLEXITY, --max-complexity COMPLEXITY

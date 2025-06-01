@@ -4,6 +4,7 @@ Content and instruction generation classes.
 
 import random
 import logging
+import time
 from typing import List, Dict, Any, Tuple, Optional
 from langchain_core.prompts import ChatPromptTemplate
 from .llm import BenchmarkLLM
@@ -11,7 +12,7 @@ from .parsers import ThinkTagSkippingParser
 
 
 class EnhancedInstructionGenerator:
-    """Generates diverse transformation instructions with expanded variety"""
+    """Generates diverse transformation instructions with expanded variety and retry logic"""
     
     def __init__(self, logger: logging.Logger):
         self.logger = logger
@@ -123,81 +124,112 @@ class EnhancedInstructionGenerator:
             "Add monitoring and analytics collection points"
         ]
 
-    def generate_instruction(self, complexity_level: int, content_type: str) -> Dict[str, Any]:
-        """Generate a diverse transformation instruction"""
+    def generate_instruction(self, complexity_level: int, content_type: str, max_retries: int = 3) -> Tuple[Dict[str, Any], int]:
+        """Generate a diverse transformation instruction with retry logic"""
         
-        complexity_level = max(1, min(5, complexity_level))
-        target = random.choice(self.targets)
+        attempts = 0
+        last_exception = None
         
-        self.logger.debug(f"Generating instruction - Complexity: {complexity_level}, Type: {content_type}")
-        self.logger.debug(f"Selected target format: {target}")
+        for attempt in range(max_retries):
+            attempts += 1
+            try:
+                complexity_level = max(1, min(5, complexity_level))
+                target = random.choice(self.targets)
+                
+                self.logger.debug(f"Generating instruction - Attempt {attempt + 1}, Complexity: {complexity_level}, Type: {content_type}")
+                self.logger.debug(f"Selected target format: {target}")
+                
+                if attempt == 0:
+                    print(f"    🎯 Target format: {target}")
+                else:
+                    print(f"    🔄 Retry {attempt}: Generating instruction...")
+                
+                instruction_parts = {
+                    "task": f"Transform {content_type} into {target}",
+                    "basic_rules": random.sample(self.formatting_rules, random.randint(2, 5)),
+                    "conditional_operations": [],
+                    "advanced_processing": [],
+                    "verification_points": []
+                }
+                
+                if attempt == 0:
+                    print(f"    📋 Basic rules: {len(instruction_parts['basic_rules'])} selected")
+                
+                # Add conditional operations based on complexity
+                if complexity_level >= 2:
+                    num_conditions = min(complexity_level + 1, len(self.conditions))
+                    for _ in range(random.randint(1, num_conditions)):
+                        condition = random.choice(self.conditions)
+                        action = random.choice(self.actions)
+                        instruction_parts["conditional_operations"].append({
+                            "condition": condition,
+                            "action": action
+                        })
+                    if attempt == 0:
+                        print(f"    🔀 Conditional operations: {len(instruction_parts['conditional_operations'])} added")
+                
+                # Add advanced processing for higher complexity
+                if complexity_level >= 3:
+                    num_modifiers = min(complexity_level - 1, len(self.complexity_modifiers))
+                    instruction_parts["advanced_processing"] = random.sample(
+                        self.complexity_modifiers, random.randint(1, num_modifiers)
+                    )
+                    if attempt == 0:
+                        print(f"    ⚡ Advanced processing: {len(instruction_parts['advanced_processing'])} modifiers")
+                
+                # Create comprehensive verification points
+                verification_points = [
+                    f"Ensure all original {content_type} elements are completely preserved",
+                    f"Validate that {target} structure is well-formed and compliant",
+                    "Verify that all conditional rules were properly applied"
+                ]
+                
+                if complexity_level >= 3:
+                    verification_points.extend([
+                        "Verify no data loss or corruption occurred during transformation",
+                        "Confirm all generated IDs are unique and properly formatted"
+                    ])
+                if complexity_level >= 4:
+                    verification_points.extend([
+                        "Verify all cross-references are bidirectional and consistent",
+                        "Confirm metadata consistency across all outputs and variants",
+                        "Validate performance characteristics meet requirements"
+                    ])
+                if complexity_level >= 5:
+                    verification_points.extend([
+                        "Verify security and validation measures are properly implemented",
+                        "Confirm scalability and optimization features are functional"
+                    ])
+                
+                instruction_parts["verification_points"] = verification_points
+                
+                self.logger.debug(f"Generated instruction with {len(verification_points)} verification points")
+                if attempt == 0:
+                    print(f"    ✅ Instruction generated: {len(verification_points)} verification points")
+                else:
+                    print(f"    ✅ Instruction generated successfully on attempt {attempt + 1}")
+                
+                return instruction_parts, attempts
+                
+            except Exception as e:
+                last_exception = e
+                self.logger.warning(f"Instruction generation attempt {attempt + 1} failed: {e}")
+                if attempt == 0:
+                    print(f"    ⚠️  Instruction generation failed: {e}")
+                
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    self.logger.info(f"Retrying instruction generation in {wait_time} seconds...")
+                    time.sleep(wait_time)
         
-        print(f"    🎯 Target format: {target}")
-        
-        instruction_parts = {
-            "task": f"Transform {content_type} into {target}",
-            "basic_rules": random.sample(self.formatting_rules, random.randint(2, 5)),
-            "conditional_operations": [],
-            "advanced_processing": [],
-            "verification_points": []
-        }
-        
-        print(f"    📋 Basic rules: {len(instruction_parts['basic_rules'])} selected")
-        
-        # Add conditional operations based on complexity
-        if complexity_level >= 2:
-            num_conditions = min(complexity_level + 1, len(self.conditions))
-            for _ in range(random.randint(1, num_conditions)):
-                condition = random.choice(self.conditions)
-                action = random.choice(self.actions)
-                instruction_parts["conditional_operations"].append({
-                    "condition": condition,
-                    "action": action
-                })
-            print(f"    🔀 Conditional operations: {len(instruction_parts['conditional_operations'])} added")
-        
-        # Add advanced processing for higher complexity
-        if complexity_level >= 3:
-            num_modifiers = min(complexity_level - 1, len(self.complexity_modifiers))
-            instruction_parts["advanced_processing"] = random.sample(
-                self.complexity_modifiers, random.randint(1, num_modifiers)
-            )
-            print(f"    ⚡ Advanced processing: {len(instruction_parts['advanced_processing'])} modifiers")
-        
-        # Create comprehensive verification points
-        verification_points = [
-            f"Ensure all original {content_type} elements are completely preserved",
-            f"Validate that {target} structure is well-formed and compliant",
-            "Verify that all conditional rules were properly applied"
-        ]
-        
-        if complexity_level >= 3:
-            verification_points.extend([
-                "Verify no data loss or corruption occurred during transformation",
-                "Confirm all generated IDs are unique and properly formatted"
-            ])
-        if complexity_level >= 4:
-            verification_points.extend([
-                "Verify all cross-references are bidirectional and consistent",
-                "Confirm metadata consistency across all outputs and variants",
-                "Validate performance characteristics meet requirements"
-            ])
-        if complexity_level >= 5:
-            verification_points.extend([
-                "Verify security and validation measures are properly implemented",
-                "Confirm scalability and optimization features are functional"
-            ])
-        
-        instruction_parts["verification_points"] = verification_points
-        
-        self.logger.debug(f"Generated instruction with {len(verification_points)} verification points")
-        print(f"    ✅ Instruction generated: {len(verification_points)} verification points")
-        
-        return instruction_parts
+        # All retries exhausted
+        self.logger.error(f"All {max_retries} instruction generation attempts failed. Last error: {last_exception}")
+        print(f"    ❌ All instruction generation attempts failed")
+        raise last_exception
 
 
 class EnhancedContentGenerator:
-    """Generates creative and varied content with random enhancements"""
+    """Generates creative and varied content with random enhancements and retry logic"""
     
     def __init__(self, llm: BenchmarkLLM, topic: Optional[str], logger: logging.Logger):
         self.llm = llm
@@ -261,46 +293,81 @@ class EnhancedContentGenerator:
             ]
         }
     
-    def generate_content(self, content_type: str) -> Tuple[str, List[str]]:
-        """Generate content with random creative variations"""
+    def generate_content(self, content_type: str, max_retries: int = 3) -> Tuple[str, List[str], int]:
+        """Generate content with random creative variations and retry logic"""
         
-        # Select random number of variations (1-3)
-        num_variations = random.randint(1, 3)
-        selected_variations = random.sample(self.creative_variations, num_variations)
+        attempts = 0
+        last_exception = None
         
-        self.logger.debug(f"Generating {content_type} content with {num_variations} variations")
-        self.logger.debug(f"Selected variations: {selected_variations}")
+        for attempt in range(max_retries):
+            attempts += 1
+            try:
+                # Select random number of variations (1-3)
+                num_variations = random.randint(1, 3)
+                selected_variations = random.sample(self.creative_variations, num_variations)
+                
+                self.logger.debug(f"Generating {content_type} content - Attempt {attempt + 1} with {num_variations} variations")
+                self.logger.debug(f"Selected variations: {selected_variations}")
+                
+                # Build enhanced prompt
+                base_prompt = random.choice(self.base_prompts.get(content_type, [
+                    f"Generate a {content_type} example with realistic structure and content"
+                ]))
+                
+                if self.topic:
+                    base_prompt = base_prompt.replace("technological", self.topic).replace("technology", self.topic)
+                    if content_type != "text":
+                        base_prompt += f" related to {self.topic}"
+                
+                # Add creative variations
+                variations_text = " ADDITIONALLY: " + "; ".join(selected_variations) + "."
+                enhanced_prompt = base_prompt + variations_text
+                
+                if attempt == 0:
+                    print(f"    🎨 Creative variations: {', '.join(selected_variations)}")
+                    print(f"    📝 Enhanced prompt: {enhanced_prompt[:120]}{'...' if len(enhanced_prompt) > 120 else ''}")
+                else:
+                    print(f"    🔄 Retry {attempt}: Generating content...")
+                
+                prompt_template = ChatPromptTemplate.from_messages([
+                    ("system", 
+                     "Generate ONLY the requested content. Be creative and follow the variation instructions. "
+                     "Output raw content directly without explanations or additional formatting."),
+                    ("user", "{prompt}")
+                ])
+                
+                if attempt == 0:
+                    print(f"    🤖 Generating enhanced {content_type} content...")
+                
+                # Use the retry-wrapped LLM call directly
+                prompt_input = prompt_template.format_messages(prompt=enhanced_prompt)
+                llm_response = self.llm.call_creative_llm(prompt_input)
+                response = ThinkTagSkippingParser().parse(llm_response.content)
+                
+                # Validate response
+                if not response or len(response.strip()) < 10:
+                    raise ValueError("Generated content is too short or empty")
+                
+                self.logger.info(f"Generated {len(response)} chars of {content_type} content with variations: {selected_variations}")
+                if attempt == 0:
+                    print(f"    ✅ Generated {len(response)} chars with {num_variations} creative variations")
+                else:
+                    print(f"    ✅ Content generated successfully on attempt {attempt + 1}")
+                
+                return response, selected_variations, attempts
+                
+            except Exception as e:
+                last_exception = e
+                self.logger.warning(f"Content generation attempt {attempt + 1} failed: {e}")
+                if attempt == 0:
+                    print(f"    ⚠️  Content generation failed: {e}")
+                
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    self.logger.info(f"Retrying content generation in {wait_time} seconds...")
+                    time.sleep(wait_time)
         
-        # Build enhanced prompt
-        base_prompt = random.choice(self.base_prompts.get(content_type, [
-            f"Generate a {content_type} example with realistic structure and content"
-        ]))
-        
-        if self.topic:
-            base_prompt = base_prompt.replace("technological", self.topic).replace("technology", self.topic)
-            if content_type != "text":
-                base_prompt += f" related to {self.topic}"
-        
-        # Add creative variations
-        variations_text = " ADDITIONALLY: " + "; ".join(selected_variations) + "."
-        enhanced_prompt = base_prompt + variations_text
-        
-        print(f"    🎨 Creative variations: {', '.join(selected_variations)}")
-        print(f"    📝 Enhanced prompt: {enhanced_prompt[:120]}{'...' if len(enhanced_prompt) > 120 else ''}")
-        
-        prompt_template = ChatPromptTemplate.from_messages([
-            ("system", 
-             "Generate ONLY the requested content. Be creative and follow the variation instructions. "
-             "Output raw content directly without explanations or additional formatting."),
-            ("user", "{prompt}")
-        ])
-        
-        chain = prompt_template | self.llm.creative_llm | ThinkTagSkippingParser()
-        
-        print(f"    🤖 Generating enhanced {content_type} content...")
-        response = chain.invoke({"prompt": enhanced_prompt})
-        
-        self.logger.info(f"Generated {len(response)} chars of {content_type} content with variations: {selected_variations}")
-        print(f"    ✅ Generated {len(response)} chars with {num_variations} creative variations")
-        
-        return response, selected_variations
+        # All retries exhausted
+        self.logger.error(f"All {max_retries} content generation attempts failed. Last error: {last_exception}")
+        print(f"    ❌ All content generation attempts failed")
+        raise last_exception

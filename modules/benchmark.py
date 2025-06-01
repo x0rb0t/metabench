@@ -19,7 +19,7 @@ from .engines import TransformationEngine, EnhancedVerificationEngine
 
 
 class TransformationBenchmark:
-    """Main benchmark runner with enhanced logging, progress tracking, and scoring"""
+    """Main benchmark runner with enhanced logging, progress tracking, retry logic, and multi-verification scoring"""
     
     def __init__(self, config: BenchmarkConfig):
         self.config = config
@@ -45,6 +45,14 @@ class TransformationBenchmark:
         self.total_trials = self.config.max_complexity * self.config.trials_per_complexity
         self.current_trial = 0
         self.benchmark_start_time = None
+        
+        # Log new configuration details
+        self.file_logger.info(f"Retry configuration: max_retries={config.max_retries}")
+        self.file_logger.info(f"Verification configuration: attempts={config.verification_attempts}, aggregation={config.verification_aggregation}")
+        
+        llm_info = self.llm.get_llm_info()
+        for llm_type, info in llm_info.items():
+            self.file_logger.info(f"{llm_type.capitalize()} LLM: {info['base_url']} (temp={info['temperature']})")
     
     def _log_content_safely(self, logger: logging.Logger, content: str, label: str, max_chars: int = 1000):
         """Log content with intelligent truncation and optional full content saving"""
@@ -70,16 +78,25 @@ class TransformationBenchmark:
                              f"Complexity {complexity_level}, Type {content_type}")
     
     def run_single_trial(self, complexity_level: int, content_type: str) -> BenchmarkResult:
-        """Run a single benchmark trial with comprehensive logging and progress tracking"""
+        """Run a single benchmark trial with comprehensive logging, progress tracking, and retry logic"""
         
         start_time = time.time()
         errors = []
+        
+        # Initialize attempt counters
+        content_attempts = 0
+        instruction_attempts = 0
+        transformation_attempts = 0
+        verification_attempts = 0
+        verification_scores = []
         
         # Enhanced trial start logging for file only
         self.file_logger.info("=" * 50)
         self.file_logger.info(f"TRIAL START: Complexity Level {complexity_level}, Content Type: {content_type}")
         self.file_logger.info(f"Trial {self.current_trial + 1}/{self.total_trials}")
         self.file_logger.info(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        self.file_logger.info(f"Max retries: {self.config.max_retries}")
+        self.file_logger.info(f"Verification attempts: {self.config.verification_attempts} ({self.config.verification_aggregation})")
         self.file_logger.info("=" * 50)
         
         print(f"    🚀 Starting trial: Complexity {complexity_level}, Type {content_type}")
@@ -92,10 +109,13 @@ class TransformationBenchmark:
             self.file_logger.info(f"PHASE 1 START: Content Generation ({content_type})")
             self.file_logger.info("-" * 30)
             
-            generated_content, content_variations = self.content_generator.generate_content(content_type)
+            generated_content, content_variations, content_attempts = self.content_generator.generate_content(
+                content_type, self.config.max_retries
+            )
             
             self.file_logger.info(f"Generated content length: {len(generated_content)} characters")
             self.file_logger.info(f"Content variations applied: {content_variations}")
+            self.file_logger.info(f"Content generation attempts: {content_attempts}")
             self._log_content_safely(self.file_logger, generated_content, "GENERATED CONTENT")
             self.file_logger.info(f"PHASE 1 COMPLETE: Content Generation")
             self.file_logger.info("-" * 30)
@@ -107,11 +127,14 @@ class TransformationBenchmark:
             self.file_logger.info(f"PHASE 2 START: Instruction Generation (Complexity {complexity_level})")
             self.file_logger.info("-" * 30)
             
-            instruction = self.instruction_generator.generate_instruction(complexity_level, content_type)
+            instruction, instruction_attempts = self.instruction_generator.generate_instruction(
+                complexity_level, content_type, self.config.max_retries
+            )
             
             self.file_logger.info("INSTRUCTION START:")
             self.file_logger.info(json.dumps(instruction, indent=2))
             self.file_logger.info("INSTRUCTION END")
+            self.file_logger.info(f"Instruction generation attempts: {instruction_attempts}")
             self.file_logger.info(f"PHASE 2 COMPLETE: Instruction Generation")
             self.file_logger.info("-" * 30)
             
@@ -123,11 +146,12 @@ class TransformationBenchmark:
             self.file_logger.info("-" * 30)
             self.file_logger.info(f"Input content length: {len(generated_content)} characters")
             
-            transformed_content = self.transformation_engine.apply_transformation(
-                generated_content, instruction
+            transformed_content, transformation_attempts = self.transformation_engine.apply_transformation(
+                generated_content, instruction, self.config.max_retries
             )
             
             self.file_logger.info(f"Output content length: {len(transformed_content)} characters")
+            self.file_logger.info(f"Transformation attempts: {transformation_attempts}")
             self._log_content_safely(self.file_logger, transformed_content, "TRANSFORMED CONTENT")
             self.file_logger.info("PHASE 3 COMPLETE: Transformation Application")
             self.file_logger.info("-" * 30)
@@ -139,13 +163,18 @@ class TransformationBenchmark:
             self.file_logger.info("PHASE 4 START: Verification")
             self.file_logger.info("-" * 30)
             
-            quality_score, completion_rate, specific_scores = self.verification_engine.verify_transformation(
-                generated_content, instruction, transformed_content
+            quality_score, completion_rate, specific_scores, verification_attempts, verification_scores = self.verification_engine.verify_transformation(
+                generated_content, instruction, transformed_content,
+                self.config.max_retries,
+                self.config.verification_attempts,
+                self.config.verification_aggregation
             )
             
             self.file_logger.info(f"Quality Score: {quality_score:.2f}/10")
             self.file_logger.info(f"Completion Rate: {completion_rate:.2%}")
             self.file_logger.info(f"Specific Scores: {specific_scores}")
+            self.file_logger.info(f"Verification attempts: {verification_attempts}")
+            self.file_logger.info(f"All verification scores: {verification_scores}")
             self.file_logger.info("PHASE 4 COMPLETE: Verification")
             self.file_logger.info("-" * 30)
             
@@ -156,6 +185,7 @@ class TransformationBenchmark:
             errors.append(error_msg)
             generated_content, content_variations, instruction, transformed_content = "", [], {}, ""
             quality_score, completion_rate, specific_scores = 0.0, 0.0, {}
+            verification_scores = [0.0]
         except json.JSONDecodeError as e:
             error_msg = f"JSON parsing error: {str(e)}"
             self.file_logger.error(f"TRIAL FAILURE: {error_msg}")
@@ -163,6 +193,7 @@ class TransformationBenchmark:
             errors.append(error_msg)
             generated_content, content_variations, instruction, transformed_content = "", [], {}, ""
             quality_score, completion_rate, specific_scores = 0.0, 0.0, {}
+            verification_scores = [0.0]
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
             self.file_logger.error("-" * 30)
@@ -175,6 +206,7 @@ class TransformationBenchmark:
             errors.append(error_msg)
             generated_content, content_variations, instruction, transformed_content = "", [], {}, ""
             quality_score, completion_rate, specific_scores = 0.0, 0.0, {}
+            verification_scores = [0.0]
         
         execution_time = time.time() - start_time
         
@@ -182,11 +214,16 @@ class TransformationBenchmark:
         self.file_logger.info("=" * 50)
         self.file_logger.info(f"TRIAL COMPLETE: Execution time {execution_time:.2f}s")
         self.file_logger.info(f"Final Results - Quality: {quality_score:.2f}/10, Completion: {completion_rate:.2%}")
+        self.file_logger.info(f"Attempt counts - Content: {content_attempts}, Instruction: {instruction_attempts}, "
+                             f"Transform: {transformation_attempts}, Verify: {verification_attempts}")
         if errors:
             self.file_logger.info(f"Errors encountered: {len(errors)}")
         self.file_logger.info("=" * 50)
         
         print(f"    ⏱️  Trial completed in {execution_time:.2f}s")
+        if content_attempts + instruction_attempts + transformation_attempts + verification_attempts > 4:
+            total_attempts = content_attempts + instruction_attempts + transformation_attempts + verification_attempts
+            print(f"    🔄 Total attempts across all phases: {total_attempts}")
         
         return BenchmarkResult(
             complexity_level=complexity_level,
@@ -199,7 +236,12 @@ class TransformationBenchmark:
             execution_time=execution_time,
             errors=errors,
             content_variations=content_variations,
-            specific_scores=specific_scores
+            specific_scores=specific_scores,
+            content_generation_attempts=content_attempts,
+            instruction_generation_attempts=instruction_attempts,
+            transformation_attempts=transformation_attempts,
+            verification_attempts=verification_attempts,
+            verification_scores=verification_scores
         )
     
     def run_benchmark(self) -> BenchmarkSummary:
@@ -214,8 +256,15 @@ class TransformationBenchmark:
         print(f"Content types: {', '.join(self.config.content_types)}")
         if self.config.topic:
             print(f"Topic: {self.config.topic}")
-        print(f"Base URL: {self.config.base_url}")
-        print(f"Model: {self.config.model_name or 'Local/Default'}")
+        
+        # Display LLM configuration
+        llm_info = self.llm.get_llm_info()
+        print(f"LLM Configuration:")
+        for llm_type, info in llm_info.items():
+            print(f"  {llm_type.capitalize()}: {info['base_url']} (temp={info['temperature']})")
+        
+        print(f"Retry settings: max_retries={self.config.max_retries}")
+        print(f"Verification: {self.config.verification_attempts} attempts, {self.config.verification_aggregation} aggregation")
         print(f"Total trials: {self.total_trials}")
         print(f"Logging to: {self.file_logger.handlers[0].baseFilename if self.file_logger.handlers else 'console only'}")
         print("-" * 60)
@@ -246,6 +295,20 @@ class TransformationBenchmark:
                 print(f"      ⏱️  Execution Time: {result.execution_time:.2f}s")
                 print(f"      📝 Content Length: {len(result.generated_content)} → {len(result.transformed_content)} chars")
                 print(f"      🎨 Variations: {', '.join(result.content_variations)}")
+                
+                # Show attempt counts if any retries occurred
+                total_attempts = (result.content_generation_attempts + result.instruction_generation_attempts + 
+                                result.transformation_attempts + result.verification_attempts)
+                if total_attempts > 4:  # More than 1 attempt per phase
+                    print(f"      🔄 Attempts: Content={result.content_generation_attempts}, "
+                          f"Instruction={result.instruction_generation_attempts}, "
+                          f"Transform={result.transformation_attempts}, "
+                          f"Verify={result.verification_attempts}")
+                
+                # Show verification score range if multiple verification attempts
+                if len(result.verification_scores) > 1:
+                    score_range = f"{min(result.verification_scores):.2f}-{max(result.verification_scores):.2f}"
+                    print(f"      🎯 Verification Range: {score_range} ({self.config.verification_aggregation})")
                 
                 if result.errors:
                     print(f"      ❌ Errors ({len(result.errors)}): {', '.join(result.errors[:2])}{'...' if len(result.errors) > 2 else ''}")
@@ -286,6 +349,12 @@ class TransformationBenchmark:
         
         error_count = sum(1 for r in self.results if r.errors)
         
+        # Calculate average attempt counts
+        avg_content_attempts = statistics.mean([r.content_generation_attempts for r in self.results])
+        avg_instruction_attempts = statistics.mean([r.instruction_generation_attempts for r in self.results])
+        avg_transformation_attempts = statistics.mean([r.transformation_attempts for r in self.results])
+        avg_verification_attempts = statistics.mean([r.verification_attempts for r in self.results])
+        
         return BenchmarkSummary(
             total_trials=len(self.results),
             average_score=statistics.mean(scores),
@@ -293,7 +362,11 @@ class TransformationBenchmark:
             scores_by_complexity=scores_by_complexity,
             completion_rates_by_complexity=completion_by_complexity,
             error_rate=error_count / len(self.results),
-            total_time=total_time
+            total_time=total_time,
+            average_content_attempts=avg_content_attempts,
+            average_instruction_attempts=avg_instruction_attempts,
+            average_transformation_attempts=avg_transformation_attempts,
+            average_verification_attempts=avg_verification_attempts
         )
     
     def _print_summary(self, summary: BenchmarkSummary):
@@ -319,6 +392,15 @@ class TransformationBenchmark:
             
             print(f"  Quality Score Change: {score_trend:+.2f} (Level 1 → {complexities[-1]})")
             print(f"  Completion Rate Change: {completion_trend:+.1%} (Level 1 → {complexities[-1]})")
+        
+        # Show retry statistics if any retries occurred
+        if (summary.average_content_attempts > 1.1 or summary.average_instruction_attempts > 1.1 or 
+            summary.average_transformation_attempts > 1.1 or summary.average_verification_attempts > 1.1):
+            print(f"\n🔄 Retry Statistics:")
+            print(f"  Content Generation: {summary.average_content_attempts:.1f} avg attempts")
+            print(f"  Instruction Generation: {summary.average_instruction_attempts:.1f} avg attempts")
+            print(f"  Transformation: {summary.average_transformation_attempts:.1f} avg attempts")
+            print(f"  Verification: {summary.average_verification_attempts:.1f} avg attempts")
     
     def save_detailed_results(self, filename: str = None):
         """Save detailed results to JSON file"""
@@ -342,7 +424,8 @@ class TransformationBenchmark:
             "metadata": {
                 "generated_at": datetime.now().isoformat(),
                 "total_trials": len(self.results),
-                "log_file": self.file_logger.handlers[0].baseFilename if self.file_logger.handlers else None
+                "log_file": self.file_logger.handlers[0].baseFilename if self.file_logger.handlers else None,
+                "llm_configuration": self.llm.get_llm_info()
             }
         }
         

@@ -10,6 +10,61 @@ from .utils import resolve_env_var
 from .benchmark import TransformationBenchmark
 
 
+def parse_args_to_config(args) -> BenchmarkConfig:
+    """Convert parsed arguments to BenchmarkConfig"""
+    
+    # Handle environment variable resolution
+    def resolve_arg(value):
+        try:
+            return resolve_env_var(value)
+        except ValueError as e:
+            print(f"Warning: {e}")
+            return value
+    
+    config = BenchmarkConfig()
+    
+    # Base URLs
+    config.base_url = resolve_arg(args.url)
+    config.creative_base_url = resolve_arg(args.creative_url) if args.creative_url else config.base_url
+    config.verification_base_url = resolve_arg(args.verification_url) if args.verification_url else config.base_url
+    config.transform_base_url = resolve_arg(args.transform_url) if args.transform_url else config.base_url
+    
+    # API and models
+    config.api_key = resolve_arg(args.api_key)
+    config.model_name = args.model
+    config.creative_model = args.creative_model
+    config.verification_model = args.verification_model
+    config.transform_model = args.transform_model
+    
+    # Benchmark settings
+    config.max_complexity = args.complexity
+    config.trials_per_complexity = args.trials
+    config.temperature = args.temperature
+    
+    # Retry settings
+    config.max_retries = args.max_retries
+    
+    # Verification settings
+    config.verification_attempts = args.verification_attempts
+    config.verification_aggregation = args.verification_aggregation
+    
+    # Content settings
+    config.content_types = [t.strip() for t in args.content.split(',') if t.strip()]
+    config.topic = args.topic
+    
+    # Output settings
+    config.log_file = args.log_file
+    
+    # Quick mode override
+    if args.quick:
+        config.max_complexity = 2
+        config.trials_per_complexity = 1
+        config.verification_attempts = 1
+        print("🚀 Quick mode: 2 complexity levels, 1 trial each")
+    
+    return config
+
+
 def interactive_mode():
     """Run benchmark in interactive mode"""
     
@@ -26,7 +81,9 @@ def interactive_mode():
     print("💡 Tip: Use 'env:VARIABLE_NAME' to reference environment variables")
     print("📝 Example: env:OPENROUTER_API_KEY")
     
-    base_url_input = input(f"Base URL [{config.base_url}]: ").strip() or config.base_url
+    # Base URLs configuration
+    print("\n🌐 Base URL Configuration:")
+    base_url_input = input(f"Default Base URL [{config.base_url}]: ").strip() or config.base_url
     try:
         config.base_url = resolve_env_var(base_url_input)
         if base_url_input.startswith('env:'):
@@ -35,6 +92,34 @@ def interactive_mode():
         print(f"❌ Error: {e}")
         config.base_url = base_url_input
     
+    # Ask if user wants different URLs for different stages
+    use_different_urls = input("Use different base URLs for different stages? (y/N): ").strip().lower() == 'y'
+    if use_different_urls:
+        creative_url_input = input(f"Creative LLM Base URL [{config.base_url}]: ").strip()
+        if creative_url_input:
+            try:
+                config.creative_base_url = resolve_env_var(creative_url_input)
+            except ValueError as e:
+                print(f"❌ Error: {e}")
+                config.creative_base_url = creative_url_input
+        
+        verification_url_input = input(f"Verification LLM Base URL [{config.base_url}]: ").strip()
+        if verification_url_input:
+            try:
+                config.verification_base_url = resolve_env_var(verification_url_input)
+            except ValueError as e:
+                print(f"❌ Error: {e}")
+                config.verification_base_url = verification_url_input
+        
+        transform_url_input = input(f"Transform LLM Base URL [{config.base_url}]: ").strip()
+        if transform_url_input:
+            try:
+                config.transform_base_url = resolve_env_var(transform_url_input)
+            except ValueError as e:
+                print(f"❌ Error: {e}")
+                config.transform_base_url = transform_url_input
+    
+    # API Key
     api_key_input = getpass.getpass(f"API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
     if api_key_input:
         try:
@@ -45,7 +130,14 @@ def interactive_mode():
             print(f"❌ Error: {e}")
             config.api_key = api_key_input
     
-    config.model_name = input("Model name (leave empty for local): ").strip()
+    # Model names
+    config.model_name = input("Default model name (leave empty for local): ").strip()
+    
+    use_different_models = input("Use different models for different stages? (y/N): ").strip().lower() == 'y'
+    if use_different_models:
+        config.creative_model = input(f"Creative model [{config.model_name}]: ").strip()
+        config.verification_model = input(f"Verification model [{config.model_name}]: ").strip()
+        config.transform_model = input(f"Transform model [{config.model_name}]: ").strip()
     
     # Benchmark configuration
     print("\n📊 Benchmark Configuration:")
@@ -74,16 +166,50 @@ def interactive_mode():
     except ValueError:
         print("Invalid input, using default")
     
+    # Retry configuration
+    print("\n🔄 Retry Configuration:")
+    try:
+        config.max_retries = max(1, int(input(f"Max retries per operation [{config.max_retries}]: ") or config.max_retries))
+    except ValueError:
+        print("Invalid input, using default")
+    
+    # Verification configuration
+    print("\n🔍 Verification Configuration:")
+    try:
+        config.verification_attempts = max(1, int(input(f"Verification attempts per trial [{config.verification_attempts}]: ") or config.verification_attempts))
+    except ValueError:
+        print("Invalid input, using default")
+    
+    if config.verification_attempts > 1:
+        print("Available aggregation methods: best, avg, worst")
+        agg_input = input(f"Verification aggregation method [{config.verification_aggregation}]: ").strip().lower()
+        if agg_input in ['best', 'avg', 'worst']:
+            config.verification_aggregation = agg_input
+    
     # Show configuration summary
     total_trials = config.max_complexity * config.trials_per_complexity
     print(f"\n🚀 Starting benchmark with:")
     print(f"  Model: {config.model_name or 'Local/Default'}")
+    if use_different_models and any([config.creative_model, config.verification_model, config.transform_model]):
+        print(f"    Creative: {config.creative_model or config.model_name or 'Local/Default'}")
+        print(f"    Verification: {config.verification_model or config.model_name or 'Local/Default'}")
+        print(f"    Transform: {config.transform_model or config.model_name or 'Local/Default'}")
+    
+    print(f"  Base URLs:")
+    print(f"    Default: {config.base_url}")
+    if use_different_urls:
+        print(f"    Creative: {config.creative_base_url}")
+        print(f"    Verification: {config.verification_base_url}")
+        print(f"    Transform: {config.transform_base_url}")
+    
     print(f"  Complexity: 1-{config.max_complexity}")
     print(f"  Trials: {config.trials_per_complexity} per level")
     print(f"  Total trials: {total_trials}")
     print(f"  Content: {', '.join(config.content_types)}")
     if config.topic:
         print(f"  Topic: {config.topic}")
+    print(f"  Max retries: {config.max_retries}")
+    print(f"  Verification: {config.verification_attempts} attempts ({config.verification_aggregation})")
     
     if input("\nProceed? (y/N): ").strip().lower() != 'y':
         print("❌ Benchmark cancelled")
@@ -104,7 +230,7 @@ def create_parser() -> argparse.ArgumentParser:
     """Create command line argument parser"""
     
     parser = argparse.ArgumentParser(
-        description="Enhanced Self-Evaluating Transformation Benchmark",
+        description="Enhanced Self-Evaluating Transformation Benchmark with Retry Logic",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -117,8 +243,11 @@ Examples:
   # Using OpenRouter with environment variables
   python benchmark.py --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL --model anthropic/claude-3-sonnet
   
-  # Using environment variables (set first: export OPENROUTER_API_KEY=your_key)
-  python benchmark.py --api-key env:OPENROUTER_API_KEY --url https://openrouter.ai/api/v1
+  # Different URLs for different stages
+  python benchmark.py --url http://localhost:1234/v1 --creative-url http://creative.local:1234/v1 --verification-url http://verification.local:1234/v1
+  
+  # With retry and verification configuration
+  python benchmark.py --max-retries 5 --verification-attempts 3 --verification-aggregation best
   
   # Topic-focused benchmark with logging
   python benchmark.py --topic "blockchain" --content code,text --log-file blockchain_test.log
@@ -140,18 +269,33 @@ Environment Variables:
     
     # Model configuration
     parser.add_argument('--url', '--base-url', default="http://localhost:1234/v1", 
-                       help='Base URL for the LLM API (supports env:VARIABLE_NAME format)')
+                       help='Default base URL for the LLM API (supports env:VARIABLE_NAME format)')
+    parser.add_argument('--creative-url', default="", 
+                       help='Base URL for creative LLM (defaults to --url if not specified)')
+    parser.add_argument('--verification-url', default="", 
+                       help='Base URL for verification LLM (defaults to --url if not specified)')
+    parser.add_argument('--transform-url', default="", 
+                       help='Base URL for transform LLM (defaults to --url if not specified)')
+    
     parser.add_argument('--api-key', default="not-needed", 
                        help='API key for the LLM service (supports env:VARIABLE_NAME format, e.g., env:OPENROUTER_API_KEY)')
-    parser.add_argument('--model', '--model-name', default="", help='Model name (leave empty for local models)')
+    parser.add_argument('--model', '--model-name', default="", help='Default model name (leave empty for local models)')
     parser.add_argument('--creative-model', default="", help='Specific model for creative content generation')
-    parser.add_argument('--structured-model', default="", help='Specific model for structured tasks')
+    parser.add_argument('--verification-model', default="", help='Specific model for verification tasks')
     parser.add_argument('--transform-model', default="", help='Specific model for transformations')
     
     # Benchmark configuration
     parser.add_argument('--complexity', '--max-complexity', type=int, default=5, help='Maximum complexity level (1-5)')
     parser.add_argument('--trials', '--trials-per-complexity', type=int, default=3, help='Number of trials per complexity level')
     parser.add_argument('--temperature', type=float, default=0.3, help='Base temperature for LLM')
+    
+    # Retry configuration
+    parser.add_argument('--max-retries', type=int, default=3, help='Maximum retries per operation (default: 3)')
+    
+    # Verification configuration
+    parser.add_argument('--verification-attempts', type=int, default=1, help='Number of verification attempts per trial (default: 1)')
+    parser.add_argument('--verification-aggregation', choices=['best', 'avg', 'worst'], default='avg', 
+                       help='How to aggregate multiple verification scores (default: avg)')
     
     # Content configuration
     parser.add_argument('--content', '--content-types', default="code,text,data,configuration,documentation", help='Comma-separated list of content types')

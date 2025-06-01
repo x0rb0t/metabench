@@ -73,3 +73,5 @@ benchmark_log_*.log
 # Temporary files
 *.tmp
 *.temp
+
+project.md
