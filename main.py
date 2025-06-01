@@ -7,7 +7,7 @@ Main entry point for the benchmark application.
 
 import sys
 from dotenv import load_dotenv
-from modules import BenchmarkConfig, TransformationBenchmark, create_parser, interactive_mode
+from modules import BenchmarkConfig, TransformationBenchmark, create_parser, interactive_mode, parse_args_to_config
 from modules.utils import resolve_env_var
 
 # Load environment variables from .env file
@@ -23,38 +23,14 @@ def main():
     if args.interactive:
         return interactive_mode()
     
-    # Resolve environment variables for API key and base URL
+    # Use parse_args_to_config to create the configuration
     try:
-        resolved_api_key = resolve_env_var(args.api_key)
-        resolved_base_url = resolve_env_var(args.url)
+        config = parse_args_to_config(args)
     except ValueError as e:
         print(f"❌ Error: {e}")
         print("💡 Tip: Use 'env:VARIABLE_NAME' to reference environment variables")
-        print("📝 Example: --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL")
+        print("📝 Example: --api-key env:OPENROUTER_API_KEY --base-url env:OPENROUTER_BASE_URL")
         return 1
-    
-    # Create configuration
-    config = BenchmarkConfig(
-        base_url=resolved_base_url,
-        api_key=resolved_api_key,
-        model_name=args.model,
-        creative_model=args.creative_model,
-        verification_model=args.verification_model,
-        transform_model=args.transform_model,
-        temperature=args.temperature,
-        topic=args.topic,
-        content_types=[t.strip() for t in args.content.split(',') if t.strip()],
-        log_file=args.log_file
-    )
-    
-    if args.quick:
-        config.max_complexity = 2
-        config.trials_per_complexity = 1
-        config.content_types = ["code", "text"]
-        print("🏃‍♂️ Quick mode: 2 complexity levels, 1 trial each, code+text only")
-    else:
-        config.max_complexity = max(1, min(5, args.complexity))
-        config.trials_per_complexity = max(1, args.trials)
     
     try:
         benchmark = TransformationBenchmark(config)

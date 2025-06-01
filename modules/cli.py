@@ -41,6 +41,11 @@ def parse_args_to_config(args) -> BenchmarkConfig:
     config.trials_per_complexity = args.trials
     config.temperature = args.temperature
     
+    # Individual temperature settings (with smart defaults)
+    config.creative_temperature = args.creative_temperature if args.creative_temperature is not None else 0.7
+    config.verification_temperature = args.verification_temperature if args.verification_temperature is not None else 0.1
+    config.transform_temperature = args.transform_temperature if args.transform_temperature is not None else args.temperature
+    
     # Retry settings
     config.max_retries = args.max_retries
     
@@ -162,9 +167,12 @@ def interactive_mode():
     
     # Temperature
     try:
-        config.temperature = max(0.0, min(2.0, float(input(f"Temperature [{config.temperature}]: ") or config.temperature)))
+        config.temperature = max(0.0, min(2.0, float(input(f"Base temperature [{config.temperature}]: ") or config.temperature)))
+        config.creative_temperature = max(0.0, min(2.0, float(input(f"Creative temperature [{config.creative_temperature}]: ") or config.creative_temperature)))
+        config.verification_temperature = max(0.0, min(2.0, float(input(f"Verification temperature [{config.verification_temperature}]: ") or config.verification_temperature)))
+        config.transform_temperature = max(0.0, min(2.0, float(input(f"Transform temperature [{config.transform_temperature}]: ") or config.transform_temperature)))
     except ValueError:
-        print("Invalid input, using default")
+        print("Invalid input, using defaults")
     
     # Retry configuration
     print("\n🔄 Retry Configuration:")
@@ -288,6 +296,9 @@ Environment Variables:
     parser.add_argument('--complexity', '--max-complexity', type=int, default=5, help='Maximum complexity level (1-5)')
     parser.add_argument('--trials', '--trials-per-complexity', type=int, default=3, help='Number of trials per complexity level')
     parser.add_argument('--temperature', type=float, default=0.3, help='Base temperature for LLM')
+    parser.add_argument('--creative-temperature', type=float, help='Temperature for creative content generation (defaults to 0.7)')
+    parser.add_argument('--verification-temperature', type=float, help='Temperature for verification tasks (defaults to 0.1)')
+    parser.add_argument('--transform-temperature', type=float, help='Temperature for transformation tasks (defaults to --temperature)')
     
     # Retry configuration
     parser.add_argument('--max-retries', type=int, default=3, help='Maximum retries per operation (default: 3)')

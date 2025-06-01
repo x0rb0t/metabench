@@ -14,7 +14,7 @@ This package contains the modular components of the transformation benchmark:
 
 from .config import BenchmarkConfig, BenchmarkResult, BenchmarkSummary
 from .benchmark import TransformationBenchmark
-from .cli import create_parser, interactive_mode
+from .cli import create_parser, interactive_mode, parse_args_to_config
 
 __all__ = [
     'BenchmarkConfig',
@@ -22,5 +22,6 @@ __all__ = [
     'BenchmarkSummary',
     'TransformationBenchmark',
     'create_parser',
-    'interactive_mode'
+    'interactive_mode',
+    'parse_args_to_config'
 ]

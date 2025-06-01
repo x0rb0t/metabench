@@ -49,6 +49,15 @@ def validate_config(config: "BenchmarkConfig") -> List[str]:
     if config.temperature < 0.0 or config.temperature > 2.0:
         issues.append("temperature must be between 0.0 and 2.0")
     
+    if config.creative_temperature < 0.0 or config.creative_temperature > 2.0:
+        issues.append("creative_temperature must be between 0.0 and 2.0")
+    
+    if config.verification_temperature < 0.0 or config.verification_temperature > 2.0:
+        issues.append("verification_temperature must be between 0.0 and 2.0")
+    
+    if config.transform_temperature < 0.0 or config.transform_temperature > 2.0:
+        issues.append("transform_temperature must be between 0.0 and 2.0")
+    
     if config.max_retries < 1:
         issues.append("max_retries must be at least 1")
     
@@ -79,6 +88,11 @@ class BenchmarkConfig:
     # API configuration
     api_key: str = "not-needed"
     temperature: float = 0.3
+    
+    # Individual temperature settings
+    creative_temperature: float = 0.7
+    verification_temperature: float = 0.1
+    transform_temperature: float = 0.3
     
     # Model configuration
     model_name: str = ""

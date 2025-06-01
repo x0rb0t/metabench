@@ -337,7 +337,10 @@ class EnhancedContentGenerator:
                 ])
                 
                 if attempt == 0:
-                    print(f"    🤖 Generating enhanced {content_type} content...")
+                    # Get model info for display
+                    llm_info = self.llm.get_llm_info()
+                    creative_model = llm_info['creative']['model'] or 'Local/Default'
+                    print(f"    🤖 Generating enhanced {content_type} content... (model: {creative_model})")
                 
                 # Use the retry-wrapped LLM call directly
                 prompt_input = prompt_template.format_messages(prompt=enhanced_prompt)

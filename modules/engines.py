@@ -34,10 +34,13 @@ class TransformationEngine:
                 self.logger.debug(f"Instruction length: {len(instruction_text)} chars")
                 
                 if attempt == 0:
+                    # Get model info for display
+                    llm_info = self.llm.get_llm_info()
+                    transform_model = llm_info['transform']['model'] or 'Local/Default'
                     print(f"    📝 Transformation instruction formatted ({len(instruction_text)} chars)")
                     print(f"    🎯 Task: {instruction['task']}")
                     print(f"    📋 Rules: {len(instruction['basic_rules'])} basic, {len(instruction.get('conditional_operations', []))} conditional")
-                    print(f"    ⚙️  Invoking transformation chain...")
+                    print(f"    ⚙️  Invoking transformation chain... (model: {transform_model})")
                 else:
                     print(f"    🔄 Retry {attempt}: Applying transformation...")
                 
@@ -137,11 +140,15 @@ class EnhancedVerificationEngine:
         self.logger.debug(f"Applicable categories: {applicable_categories}")
         self.logger.debug(f"Verification attempts: {verification_attempts}, Aggregation: {aggregation_method}")
         
+        # Get model info for display
+        llm_info = self.llm.get_llm_info()
+        verification_model = llm_info['verification']['model'] or 'Local/Default'
+        
         print(f"    🔍 Verification criteria: {len(instruction_text)} chars")
         print(f"    📊 Comparing {len(original_content)} → {len(transformed_content)} chars")
         print(f"    📋 Requirements to verify: {len(requirements_list)} items")
         print(f"    🎯 Applicable categories: {len(applicable_categories)}")
-        print(f"    🔄 Verification attempts: {verification_attempts} ({aggregation_method})")
+        print(f"    🔄 Verification attempts: {verification_attempts} ({aggregation_method}) (model: {verification_model})")
         
         all_verification_results = []
         total_attempts = 0

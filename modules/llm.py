@@ -56,7 +56,7 @@ class BenchmarkLLM:
         # Initialize LLMs with different base URLs and temperatures
         self.creative_llm = ChatOpenAI(
             base_url=config.creative_base_url,
-            temperature=0.8,
+            temperature=config.creative_temperature,
             api_key=config.api_key,
             model=config.creative_model or config.model_name,
             timeout=60,
@@ -65,7 +65,7 @@ class BenchmarkLLM:
         
         self.verification_llm = ChatOpenAI(
             base_url=config.verification_base_url,
-            temperature=0.2,
+            temperature=config.verification_temperature,
             api_key=config.api_key,
             model=config.verification_model or config.model_name,
             timeout=60,
@@ -74,7 +74,7 @@ class BenchmarkLLM:
         
         self.transform_llm = ChatOpenAI(
             base_url=config.transform_base_url,
-            temperature=0.1,
+            temperature=config.transform_temperature,
             api_key=config.api_key,
             model=config.transform_model or config.model_name,
             timeout=60,
@@ -101,16 +101,16 @@ class BenchmarkLLM:
             "creative": {
                 "base_url": self.config.creative_base_url,
                 "model": self.config.creative_model or self.config.model_name,
-                "temperature": 0.8
+                "temperature": self.config.creative_temperature
             },
             "verification": {
                 "base_url": self.config.verification_base_url,
                 "model": self.config.verification_model or self.config.model_name,
-                "temperature": 0.2
+                "temperature": self.config.verification_temperature
             },
             "transform": {
                 "base_url": self.config.transform_base_url,
                 "model": self.config.transform_model or self.config.model_name,
-                "temperature": 0.1
+                "temperature": self.config.transform_temperature
             }
         }

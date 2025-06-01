@@ -174,6 +174,46 @@ uv run main.py --url https://api.openai.com/v1 --api-key sk-your-key --model gpt
 uv run main.py --url https://api.anthropic.com --api-key your-key --model claude-3-sonnet
 ```
 
+### Temperature Configuration
+
+MetaBench supports individual temperature settings for different types of tasks, allowing fine-tuned control over model behavior:
+
+```bash
+# Use default temperatures (optimized for each task type)
+uv run main.py
+
+# Set base temperature for all tasks
+uv run main.py --temperature 0.5
+
+# Fine-tune individual temperatures
+uv run main.py \
+  --temperature 0.3 \
+  --creative-temperature 0.8 \
+  --verification-temperature 0.1 \
+  --transform-temperature 0.4
+```
+
+**Temperature Defaults:**
+- **Base temperature**: 0.3 (used as fallback)
+- **Creative temperature**: 0.7 (higher for more diverse content generation)
+- **Verification temperature**: 0.1 (lower for consistent, reliable scoring)
+- **Transform temperature**: Uses base temperature (balanced approach)
+
+**Temperature Guidelines:**
+- **Low (0.0-0.3)**: More focused, deterministic responses
+- **Medium (0.3-0.7)**: Balanced creativity and consistency
+- **High (0.7-1.0+)**: More creative, diverse responses
+
+**Different Models for Different Tasks:**
+```bash
+# Use specialized models with optimized temperatures
+uv run main.py \
+  --model gpt-4 \
+  --creative-model gpt-4 --creative-temperature 0.8 \
+  --verification-model gpt-3.5-turbo --verification-temperature 0.1 \
+  --transform-model gpt-4 --transform-temperature 0.3
+```
+
 ### Content-Specific Testing
 ```bash
 # Test only code transformations
@@ -246,7 +286,10 @@ config = BenchmarkConfig(
     trials_per_complexity=3,
     content_types=["code", "text", "data"],
     topic="artificial intelligence",
-    temperature=0.3
+    temperature=0.3,
+    creative_temperature=0.7,
+    verification_temperature=0.1,
+    transform_temperature=0.3
 )
 
 benchmark = TransformationBenchmark(config)
@@ -295,21 +338,32 @@ OPENAI_API_KEY=sk-your-openai-key
 
 ```bash
 % uv run main.py --help
-usage: main.py [-h] [--interactive] [--quick] [--url URL] [--api-key API_KEY] [--model MODEL] [--creative-model CREATIVE_MODEL]
-               [--verification-model VERIFICATION_MODEL] [--transform-model TRANSFORM_MODEL] [--complexity COMPLEXITY] [--trials TRIALS]
-               [--temperature TEMPERATURE] [--content CONTENT] [--topic TOPIC] [--output OUTPUT] [--log-file LOG_FILE] [--quiet]
+usage: main.py [-h] [--interactive] [--quick] [--url URL] [--creative-url CREATIVE_URL] [--verification-url VERIFICATION_URL]
+               [--transform-url TRANSFORM_URL] [--api-key API_KEY] [--model MODEL] [--creative-model CREATIVE_MODEL]
+               [--verification-model VERIFICATION_MODEL] [--transform-model TRANSFORM_MODEL] [--complexity COMPLEXITY] 
+               [--trials TRIALS] [--temperature TEMPERATURE] [--creative-temperature CREATIVE_TEMPERATURE] 
+               [--verification-temperature VERIFICATION_TEMPERATURE] [--transform-temperature TRANSFORM_TEMPERATURE] 
+               [--max-retries MAX_RETRIES] [--verification-attempts VERIFICATION_ATTEMPTS] 
+               [--verification-aggregation {best,avg,worst}] [--content CONTENT] [--topic TOPIC] [--output OUTPUT] 
+               [--log-file LOG_FILE] [--quiet]
 
-Enhanced Self-Evaluating Transformation Benchmark
+Enhanced Self-Evaluating Transformation Benchmark with Retry Logic
 
 options:
   -h, --help            show this help message and exit
   --interactive, -i     Run in interactive mode
   --quick, -q           Quick benchmark (2 complexity levels, 1 trial each)
   --url URL, --base-url URL
-                        Base URL for the LLM API
-  --api-key API_KEY     API key for the LLM service
+                        Default base URL for the LLM API (supports env:VARIABLE_NAME format)
+  --creative-url CREATIVE_URL
+                        Base URL for creative LLM (defaults to --url if not specified)
+  --verification-url VERIFICATION_URL
+                        Base URL for verification LLM (defaults to --url if not specified)
+  --transform-url TRANSFORM_URL
+                        Base URL for transform LLM (defaults to --url if not specified)
+  --api-key API_KEY     API key for the LLM service (supports env:VARIABLE_NAME format)
   --model MODEL, --model-name MODEL
-                        Model name (leave empty for local models)
+                        Default model name (leave empty for local models)
   --creative-model CREATIVE_MODEL
                         Specific model for creative content generation
   --verification-model VERIFICATION_MODEL
@@ -322,6 +376,18 @@ options:
                         Number of trials per complexity level
   --temperature TEMPERATURE
                         Base temperature for LLM
+  --creative-temperature CREATIVE_TEMPERATURE
+                        Temperature for creative content generation (defaults to 0.7)
+  --verification-temperature VERIFICATION_TEMPERATURE
+                        Temperature for verification tasks (defaults to 0.1)
+  --transform-temperature TRANSFORM_TEMPERATURE
+                        Temperature for transformation tasks (defaults to --temperature)
+  --max-retries MAX_RETRIES
+                        Maximum retries per operation (default: 3)
+  --verification-attempts VERIFICATION_ATTEMPTS
+                        Number of verification attempts per trial (default: 1)
+  --verification-aggregation {best,avg,worst}
+                        How to aggregate multiple verification scores (default: avg)
   --content CONTENT, --content-types CONTENT
                         Comma-separated list of content types
   --topic TOPIC         Topic for content generation (makes content topic-specific)
@@ -334,11 +400,20 @@ Examples:
   # Quick test with local model
   python benchmark.py --quick
   
-  # Full benchmark with specific model
-  python benchmark.py --model gpt-3.5-turbo --url https://api.openai.com/v1
+  # Full benchmark with specific model and temperatures
+  python benchmark.py --model gpt-4 --url https://api.openai.com/v1 --temperature 0.3 --creative-temperature 0.8
   
-  # Topic-focused benchmark with logging
-  python benchmark.py --topic "blockchain" --content code,text --log-file blockchain_test.log
+  # Different URLs and models for different stages
+  python benchmark.py --url http://localhost:1234/v1 --creative-url http://creative.local:1234/v1 --verification-url http://verification.local:1234/v1
+  
+  # With retry and verification configuration
+  python benchmark.py --max-retries 5 --verification-attempts 3 --verification-aggregation best
+  
+  # Topic-focused benchmark with fine-tuned temperatures
+  python benchmark.py --topic "blockchain" --content code,text --creative-temperature 0.8 --verification-temperature 0.1
+  
+  # Complete temperature control example
+  python benchmark.py --temperature 0.2 --creative-temperature 0.9 --verification-temperature 0.05 --transform-temperature 0.4
   
   # Interactive mode
   python benchmark.py --interactive

@@ -261,7 +261,8 @@ class TransformationBenchmark:
         llm_info = self.llm.get_llm_info()
         print(f"LLM Configuration:")
         for llm_type, info in llm_info.items():
-            print(f"  {llm_type.capitalize()}: {info['base_url']} (temp={info['temperature']})")
+            model_name = info['model'] or 'Local/Default'
+            print(f"  {llm_type.capitalize()}: {info['base_url']} (model={model_name}, temp={info['temperature']})")
         
         print(f"Retry settings: max_retries={self.config.max_retries}")
         print(f"Verification: {self.config.verification_attempts} attempts, {self.config.verification_aggregation} aggregation")
