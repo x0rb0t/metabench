@@ -57,7 +57,7 @@ class BenchmarkLLM:
         self.creative_llm = ChatOpenAI(
             base_url=config.creative_base_url,
             temperature=config.creative_temperature,
-            api_key=config.api_key,
+            api_key=config.creative_api_key,
             model=config.creative_model or config.model_name,
             timeout=60,
             max_retries=0  # We handle retries manually
@@ -66,7 +66,7 @@ class BenchmarkLLM:
         self.verification_llm = ChatOpenAI(
             base_url=config.verification_base_url,
             temperature=config.verification_temperature,
-            api_key=config.api_key,
+            api_key=config.verification_api_key,
             model=config.verification_model or config.model_name,
             timeout=60,
             max_retries=0  # We handle retries manually
@@ -75,7 +75,7 @@ class BenchmarkLLM:
         self.transform_llm = ChatOpenAI(
             base_url=config.transform_base_url,
             temperature=config.transform_temperature,
-            api_key=config.api_key,
+            api_key=config.transform_api_key,
             model=config.transform_model or config.model_name,
             timeout=60,
             max_retries=0  # We handle retries manually

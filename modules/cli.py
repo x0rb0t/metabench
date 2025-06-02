@@ -1,5 +1,5 @@
 """
-CLI argument parsing and interactive mode functionality.
+CLI argument parsing and interactive mode functionality with enhanced content type support.
 """
 
 import argparse
@@ -31,6 +31,9 @@ def parse_args_to_config(args) -> BenchmarkConfig:
     
     # API and models
     config.api_key = resolve_arg(args.api_key)
+    config.creative_api_key = resolve_arg(args.creative_api_key) if args.creative_api_key else config.api_key
+    config.verification_api_key = resolve_arg(args.verification_api_key) if args.verification_api_key else config.api_key
+    config.transform_api_key = resolve_arg(args.transform_api_key) if args.transform_api_key else config.api_key
     config.model_name = args.model
     config.creative_model = args.creative_model
     config.verification_model = args.verification_model
@@ -71,7 +74,7 @@ def parse_args_to_config(args) -> BenchmarkConfig:
 
 
 def interactive_mode():
-    """Run benchmark in interactive mode"""
+    """Run benchmark in interactive mode with enhanced content type selection"""
     
     print("🤖 Transformation Benchmark - Interactive Mode")
     print("=" * 50)
@@ -125,7 +128,7 @@ def interactive_mode():
                 config.transform_base_url = transform_url_input
     
     # API Key
-    api_key_input = getpass.getpass(f"API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
+    api_key_input = getpass.getpass(f"Default API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
     if api_key_input:
         try:
             config.api_key = resolve_env_var(api_key_input)
@@ -134,6 +137,39 @@ def interactive_mode():
         except ValueError as e:
             print(f"❌ Error: {e}")
             config.api_key = api_key_input
+    
+    # Ask if user wants different API keys for different stages
+    use_different_api_keys = input("Use different API keys for different stages? (y/N): ").strip().lower() == 'y'
+    if use_different_api_keys:
+        creative_api_key_input = getpass.getpass(f"Creative API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
+        if creative_api_key_input:
+            try:
+                config.creative_api_key = resolve_env_var(creative_api_key_input)
+                if creative_api_key_input.startswith('env:'):
+                    print(f"✅ Resolved environment variable for creative API key")
+            except ValueError as e:
+                print(f"❌ Error: {e}")
+                config.creative_api_key = creative_api_key_input
+        
+        verification_api_key_input = getpass.getpass(f"Verification API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
+        if verification_api_key_input:
+            try:
+                config.verification_api_key = resolve_env_var(verification_api_key_input)
+                if verification_api_key_input.startswith('env:'):
+                    print(f"✅ Resolved environment variable for verification API key")
+            except ValueError as e:
+                print(f"❌ Error: {e}")
+                config.verification_api_key = verification_api_key_input
+        
+        transform_api_key_input = getpass.getpass(f"Transform API Key [{'***masked***' if config.api_key else 'none'}]: ").strip()
+        if transform_api_key_input:
+            try:
+                config.transform_api_key = resolve_env_var(transform_api_key_input)
+                if transform_api_key_input.startswith('env:'):
+                    print(f"✅ Resolved environment variable for transform API key")
+            except ValueError as e:
+                print(f"❌ Error: {e}")
+                config.transform_api_key = transform_api_key_input
     
     # Model names
     config.model_name = input("Default model name (leave empty for local): ").strip()
@@ -156,9 +192,16 @@ def interactive_mode():
     except ValueError:
         print("Invalid input, using default")
     
-    # Content types
-    print(f"\nAvailable content types: {', '.join(config.content_types)}")
-    content_input = input("Content types (comma-separated, or press Enter for all): ").strip()
+    # Enhanced content types selection
+    print(f"\n📝 Content Type Selection:")
+    print("Available content types:")
+    print("  🎨 Creative: poetry, short_story, song_lyrics, screenplay, philosophical_essay")
+    print("  💻 Technical: code, api_documentation, database_schema, system_logs, scientific_paper")
+    print("  🔀 Hybrid: interview_transcript, product_review, tutorial, case_study")
+    print("  📄 Traditional: text, data, configuration, documentation")
+    print(f"\nDefault selection: {', '.join(config.content_types)}")
+    
+    content_input = input("Content types (comma-separated, or press Enter for default): ").strip()
     if content_input:
         config.content_types = [t.strip() for t in content_input.split(',') if t.strip()]
     
@@ -210,6 +253,21 @@ def interactive_mode():
         print(f"    Verification: {config.verification_base_url}")
         print(f"    Transform: {config.transform_base_url}")
     
+    # Show API key information if different keys are used
+    if use_different_api_keys and any([
+        config.creative_api_key != config.api_key,
+        config.verification_api_key != config.api_key,
+        config.transform_api_key != config.api_key
+    ]):
+        print(f"  API Keys:")
+        print(f"    Default: {'***masked***' if config.api_key else 'none'}")
+        if config.creative_api_key != config.api_key:
+            print(f"    Creative: {'***masked***' if config.creative_api_key else 'none'}")
+        if config.verification_api_key != config.api_key:
+            print(f"    Verification: {'***masked***' if config.verification_api_key else 'none'}")
+        if config.transform_api_key != config.api_key:
+            print(f"    Transform: {'***masked***' if config.transform_api_key else 'none'}")
+    
     print(f"  Complexity: 1-{config.max_complexity}")
     print(f"  Trials: {config.trials_per_complexity} per level")
     print(f"  Total trials: {total_trials}")
@@ -235,32 +293,48 @@ def interactive_mode():
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create command line argument parser"""
+    """Create command line argument parser with enhanced content type support"""
     
     parser = argparse.ArgumentParser(
-        description="Enhanced Self-Evaluating Transformation Benchmark with Retry Logic",
+        description="Enhanced Self-Evaluating Transformation Benchmark with Exponential Complexity Scaling",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Content Types:
+  Creative: poetry, short_story, song_lyrics, screenplay, philosophical_essay
+  Technical: code, api_documentation, database_schema, system_logs, scientific_paper  
+  Hybrid: interview_transcript, product_review, tutorial, case_study
+  Traditional: text, data, configuration, documentation
+
+Complexity Levels:
+  Level 1: Simple structural transformations (format changes)
+  Level 2: Enhanced structural + basic conditions  
+  Level 3: Cross-format + semantic transformations
+  Level 4: Complex multi-stage transformations
+  Level 5: Creative reinterpretation + meta-transformation
+
 Examples:
-  # Quick test with local model
-  python benchmark.py --quick
+  # Quick test with creative content types
+  python benchmark.py --quick --content "poetry,short_story,code"
   
-  # Full benchmark with specific model
-  python benchmark.py --model gpt-3.5-turbo --url https://api.openai.com/v1
+  # Full benchmark with diverse content mix
+  python benchmark.py --content "code,poetry,tutorial,api_documentation" --complexity 4
   
-  # Using OpenRouter with environment variables
-  python benchmark.py --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL --model anthropic/claude-3-sonnet
+  # Topic-focused creative benchmark
+  python benchmark.py --topic "artificial intelligence" --content "poetry,philosophical_essay,tutorial" 
   
-  # Different URLs for different stages
-  python benchmark.py --url http://localhost:1234/v1 --creative-url http://creative.local:1234/v1 --verification-url http://verification.local:1234/v1
+  # Using OpenRouter with specific models for different stages
+  python benchmark.py --api-key env:OPENROUTER_API_KEY --url env:OPENROUTER_BASE_URL \\
+    --creative-model anthropic/claude-3-sonnet --verification-model anthropic/claude-3-haiku
   
-  # With retry and verification configuration
-  python benchmark.py --max-retries 5 --verification-attempts 3 --verification-aggregation best
+  # Using different API keys and URLs for different stages
+  python benchmark.py --creative-model qwen3-0.6b --transform-model qwen3-0.6b \\
+    --verification-model deepseek/deepseek-r1-0528-qwen3-8b:free \\
+    --verification-api-key env:OPENROUTER_API_KEY --verification-url env:OPENROUTER_BASE_URL
   
-  # Topic-focused benchmark with logging
-  python benchmark.py --topic "blockchain" --content code,text --log-file blockchain_test.log
+  # High complexity test with multiple verification attempts
+  python benchmark.py --complexity 5 --verification-attempts 3 --verification-aggregation best
   
-  # Interactive mode
+  # Interactive mode for guided setup
   python benchmark.py --interactive
 
 Environment Variables:
@@ -286,7 +360,13 @@ Environment Variables:
                        help='Base URL for transform LLM (defaults to --url if not specified)')
     
     parser.add_argument('--api-key', default="not-needed", 
-                       help='API key for the LLM service (supports env:VARIABLE_NAME format, e.g., env:OPENROUTER_API_KEY)')
+                       help='Default API key for the LLM service (supports env:VARIABLE_NAME format, e.g., env:OPENROUTER_API_KEY)')
+    parser.add_argument('--creative-api-key', default="", 
+                       help='API key for creative LLM (defaults to --api-key if not specified)')
+    parser.add_argument('--verification-api-key', default="", 
+                       help='API key for verification LLM (defaults to --api-key if not specified)')
+    parser.add_argument('--transform-api-key', default="", 
+                       help='API key for transform LLM (defaults to --api-key if not specified)')
     parser.add_argument('--model', '--model-name', default="", help='Default model name (leave empty for local models)')
     parser.add_argument('--creative-model', default="", help='Specific model for creative content generation')
     parser.add_argument('--verification-model', default="", help='Specific model for verification tasks')
@@ -308,8 +388,10 @@ Environment Variables:
     parser.add_argument('--verification-aggregation', choices=['best', 'avg', 'worst'], default='avg', 
                        help='How to aggregate multiple verification scores (default: avg)')
     
-    # Content configuration
-    parser.add_argument('--content', '--content-types', default="code,text,data,configuration,documentation", help='Comma-separated list of content types')
+    # Content configuration with enhanced default
+    default_content = "code,text,data,poetry,short_story,tutorial,api_documentation"
+    parser.add_argument('--content', '--content-types', default=default_content, 
+                       help=f'Comma-separated list of content types (default: {default_content})')
     parser.add_argument('--topic', help='Topic for content generation (makes content topic-specific)')
     
     # Output configuration

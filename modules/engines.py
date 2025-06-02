@@ -1,5 +1,5 @@
 """
-Transformation and verification engines.
+Transformation and verification engines - FIXED VERSION.
 """
 
 import json
@@ -117,7 +117,7 @@ class TransformationEngine:
 
 
 class EnhancedVerificationEngine:
-    """Verifies and scores transformation results with improved logic, retry, and multiple attempts"""
+    """Verifies and scores transformation results with improved logic, retry, and multiple attempts - FIXED VERSION"""
     
     def __init__(self, llm: BenchmarkLLM, logger: logging.Logger):
         self.llm = llm
@@ -190,7 +190,10 @@ class EnhancedVerificationEngine:
         # Log each specific score with applicability
         for category, score in specific_scores.items():
             if category in applicable_categories:
-                print(f"      🎯 {category}: {score:.2f}/10")
+                if score is not None:
+                    print(f"      🎯 {category}: {score:.2f}/10")
+                else:
+                    print(f"      ⚠️  {category}: N/A (null score)")
             else:
                 print(f"      ⚫ {category}: N/A (not applicable)")
         
@@ -203,36 +206,37 @@ class EnhancedVerificationEngine:
                                    requirements_list: List[str],
                                    applicable_categories: List[str],
                                    max_retries: int) -> Tuple[Dict[str, Any], int]:
-        """Perform a single verification attempt with retry logic"""
+        """Perform a single verification attempt with retry logic - FIXED VERSION"""
         
         attempts = 0
         last_exception = None
         
+        # Simplified verification prompt to avoid JSON parsing issues
         verification_prompt = ChatPromptTemplate.from_messages([
             ("system",
-             "You are a strict verification engine. Analyze transformation results objectively. "
-             "Score only the applicable categories. Return ONLY valid JSON in the specified format."),
+             "You are a strict verification engine. Analyze transformation results objectively and return valid JSON only. "
+             "Score applicable categories from 0-10. Use null for non-applicable categories. "
+             "Ensure all JSON is properly formatted with no extra text."),
             ("user",
              "Original content:\n{original}\n\n"
              "Transformation instructions:\n{instruction}\n\n" 
              "Transformed result:\n{transformed}\n\n"
              "Requirements to evaluate:\n{requirements}\n\n"
              "Applicable categories: {categories}\n\n"
-             "Return JSON with this EXACT structure:\n"
+             "Return JSON with this EXACT structure (no additional text):\n"
              "{{\n"
              '  "specific_scores": {{\n'
-             '    "basic_rules_score": <float 0-10 or null if not applicable>,\n'
-             '    "conditional_operations_score": <float 0-10 or null if not applicable>,\n'
-             '    "advanced_processing_score": <float 0-10 or null if not applicable>,\n'
-             '    "verification_requirements_score": <float 0-10>,\n'
-             '    "data_preservation_score": <float 0-10>,\n'
-             '    "format_compliance_score": <float 0-10>\n'
+             '    "basic_rules_score": <number 0-10 or null>,\n'
+             '    "conditional_operations_score": <number 0-10 or null>,\n'
+             '    "advanced_processing_score": <number 0-10 or null>,\n'
+             '    "verification_requirements_score": <number 0-10>,\n'
+             '    "data_preservation_score": <number 0-10>,\n'
+             '    "format_compliance_score": <number 0-10>\n'
              '  }},\n'
-             '  "quality_score": <float 0-10>,\n'
-             '  "instruction_completion": <float 0-1>,\n'
-             '  "feedback": "<detailed explanation>"\n'
-             "}}\n\n"
-             "Score only applicable categories. Use null for non-applicable categories.")
+             '  "quality_score": <number 0-10>,\n'
+             '  "instruction_completion": <number 0-1>,\n'
+             '  "feedback": "<brief explanation>"\n'
+             "}}")
         ])
         
         for attempt in range(max_retries):
@@ -251,10 +255,18 @@ class EnhancedVerificationEngine:
                 )
                 llm_response = self.llm.call_verification_llm(prompt_input)
                 json_text = ThinkTagSkippingParser().parse(llm_response.content)
-                result = JsonOutputParser().parse(json_text)
                 
-                # Process specific scores with proper null handling
-                specific_scores = self._process_specific_scores(
+                # Clean JSON text to avoid parsing issues
+                json_text = self._clean_json_text(json_text)
+                
+                try:
+                    result = JsonOutputParser().parse(json_text)
+                except json.JSONDecodeError as e:
+                    self.logger.warning(f"JSON parsing failed, attempting to extract JSON from response: {e}")
+                    result = self._extract_json_from_text(json_text)
+                
+                # Process specific scores with proper null handling - FIXED
+                specific_scores = self._process_specific_scores_fixed(
                     result.get('specific_scores', {}), 
                     applicable_categories
                 )
@@ -263,7 +275,7 @@ class EnhancedVerificationEngine:
                 quality_score = self._validate_float_score(result.get('quality_score', 0), 0, 10, "quality_score")
                 completion_rate = self._validate_float_score(result.get('instruction_completion', 0), 0, 1, "instruction_completion")
                 
-                # Calculate average only from applicable categories
+                # Calculate average only from applicable categories - FIXED
                 applicable_scores = [score for cat, score in specific_scores.items() 
                                    if cat in applicable_categories and score is not None]
                 avg_specific = sum(applicable_scores) / len(applicable_scores) if applicable_scores else 0
@@ -289,17 +301,6 @@ class EnhancedVerificationEngine:
                     self.logger.info(f"Retrying verification in {wait_time} seconds...")
                     time.sleep(wait_time)
                     
-            except json.JSONDecodeError as e:
-                last_exception = e
-                self.logger.warning(f"JSON parsing error in verification attempt {attempt + 1}: {e}")
-                if attempt == 0:
-                    print(f"    📄 JSON parsing error in verification: {e}")
-                
-                if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    self.logger.info(f"Retrying verification in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    
             except Exception as e:
                 last_exception = e
                 self.logger.warning(f"Verification attempt {attempt + 1} failed: {e}")
@@ -315,13 +316,90 @@ class EnhancedVerificationEngine:
         self.logger.error(f"All {max_retries} verification attempts failed. Last error: {last_exception}")
         print(f"    ❌ All verification attempts failed, using default scores")
         
+        # Create safe default scores for applicable categories
+        default_specific_scores = {}
+        for category in ['basic_rules_score', 'conditional_operations_score', 'advanced_processing_score',
+                        'verification_requirements_score', 'data_preservation_score', 'format_compliance_score']:
+            if category in applicable_categories:
+                default_specific_scores[category] = 0.0
+            else:
+                default_specific_scores[category] = None
+        
         return {
             'quality_score': 0.0,
             'completion_rate': 0.0,
-            'specific_scores': {},
+            'specific_scores': default_specific_scores,
             'feedback': f'Verification failed: {last_exception}',
             'avg_specific': 0.0
         }, attempts
+    
+    def _clean_json_text(self, json_text: str) -> str:
+        """Clean JSON text to remove common formatting issues"""
+        # Remove code block markers
+        json_text = json_text.replace("```json", "").replace("```", "")
+        # Remove extra whitespace
+        json_text = json_text.strip()
+        # Find JSON object boundaries
+        start = json_text.find('{')
+        end = json_text.rfind('}') + 1
+        if start >= 0 and end > start:
+            json_text = json_text[start:end]
+        return json_text
+    
+    def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
+        """Extract JSON from text when normal parsing fails"""
+        try:
+            # Try to find JSON-like structure
+            import re
+            json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except:
+            pass
+        
+        # Return minimal valid structure if all else fails
+        return {
+            "specific_scores": {
+                "basic_rules_score": 0,
+                "conditional_operations_score": None,
+                "advanced_processing_score": None,
+                "verification_requirements_score": 0,
+                "data_preservation_score": 0,
+                "format_compliance_score": 0
+            },
+            "quality_score": 0,
+            "instruction_completion": 0,
+            "feedback": "JSON parsing failed"
+        }
+    
+    def _process_specific_scores_fixed(self, specific_scores: Dict[str, Any], applicable_categories: List[str]) -> Dict[str, float]:
+        """Process specific scores with improved null handling - FIXED VERSION"""
+        processed_scores = {}
+        
+        all_categories = [
+            'basic_rules_score', 'conditional_operations_score', 'advanced_processing_score',
+            'verification_requirements_score', 'data_preservation_score', 'format_compliance_score'
+        ]
+        
+        for category in all_categories:
+            score_value = specific_scores.get(category)
+            
+            if category in applicable_categories:
+                # This category should be scored
+                if score_value is None or score_value == "null":
+                    self.logger.warning(f"Applicable category {category} was null, using 0.0")
+                    processed_scores[category] = 0.0
+                else:
+                    try:
+                        processed_scores[category] = self._validate_float_score(score_value, 0, 10, category)
+                    except (ValueError, TypeError):
+                        self.logger.warning(f"Invalid {category} value '{score_value}', using 0.0")
+                        processed_scores[category] = 0.0
+            else:
+                # This category is not applicable
+                processed_scores[category] = None
+        
+        return processed_scores
     
     def _aggregate_verification_results(self, results: List[Dict[str, Any]], method: str) -> Dict[str, Any]:
         """Aggregate multiple verification results using specified method"""
@@ -354,7 +432,7 @@ class EnhancedVerificationEngine:
             aggregated_quality = statistics.mean(quality_scores)
             aggregated_completion = statistics.mean(completion_rates)
             
-            # Average specific scores
+            # Average specific scores - FIXED
             all_categories = set()
             for result in results:
                 all_categories.update(result['specific_scores'].keys())
@@ -392,31 +470,6 @@ class EnhancedVerificationEngine:
         
         return applicable
     
-    def _process_specific_scores(self, specific_scores: Dict[str, Any], applicable_categories: List[str]) -> Dict[str, float]:
-        """Process specific scores, handling null values for non-applicable categories"""
-        processed_scores = {}
-        
-        all_categories = [
-            'basic_rules_score', 'conditional_operations_score', 'advanced_processing_score',
-            'verification_requirements_score', 'data_preservation_score', 'format_compliance_score'
-        ]
-        
-        for category in all_categories:
-            score_value = specific_scores.get(category)
-            
-            if category in applicable_categories:
-                # This category should be scored
-                if score_value is None:
-                    self.logger.warning(f"Applicable category {category} was null, using 0.0")
-                    processed_scores[category] = 0.0
-                else:
-                    processed_scores[category] = self._validate_float_score(score_value, 0, 10, category)
-            else:
-                # This category is not applicable
-                processed_scores[category] = None
-        
-        return processed_scores
-    
     def _extract_requirements_list(self, instruction: Dict[str, Any]) -> List[str]:
         """Extract a flat list of all requirements from instruction"""
         requirements = []
@@ -434,6 +487,10 @@ class EnhancedVerificationEngine:
     def _validate_float_score(self, value: Any, min_val: float, max_val: float, field_name: str) -> float:
         """Validate and clamp a score value to be a float within range"""
         try:
+            if value is None or value == "null":
+                self.logger.warning(f"{field_name} is null, using 0.0")
+                return 0.0
+                
             float_value = float(value)
             clamped_value = max(min_val, min(max_val, float_value))
             

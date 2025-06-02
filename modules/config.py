@@ -1,5 +1,5 @@
 """
-Configuration classes and validation functions.
+Configuration classes and validation functions with enhanced content type support.
 """
 
 from dataclasses import dataclass, asdict
@@ -10,7 +10,7 @@ def sanitize_config_for_logging(config: "BenchmarkConfig") -> Dict[str, Any]:
     """Create a sanitized version of config for logging without sensitive data"""
     config_dict = asdict(config)
     # Replace sensitive fields with masked values
-    sensitive_fields = ['api_key']
+    sensitive_fields = ['api_key', 'creative_api_key', 'verification_api_key', 'transform_api_key']
     for field in sensitive_fields:
         if field in config_dict and config_dict[field]:
             # Show only first 4 and last 4 characters if longer than 8, otherwise mask completely
@@ -26,7 +26,7 @@ def sanitize_config_for_saving(config: "BenchmarkConfig") -> Dict[str, Any]:
     """Create a sanitized version of config for saving to files without sensitive data"""
     config_dict = asdict(config)
     # Remove sensitive fields entirely from saved data
-    sensitive_fields = ['api_key']
+    sensitive_fields = ['api_key', 'creative_api_key', 'verification_api_key', 'transform_api_key']
     for field in sensitive_fields:
         if field in config_dict:
             config_dict[field] = "***removed_for_security***"
@@ -67,18 +67,27 @@ def validate_config(config: "BenchmarkConfig") -> List[str]:
     if config.verification_aggregation not in ['best', 'avg', 'worst']:
         issues.append("verification_aggregation must be 'best', 'avg', or 'worst'")
     
-    # Validate content types
-    valid_content_types = {"code", "text", "data", "configuration", "documentation"}
+    # Validate content types with expanded valid types
+    valid_content_types = {
+        # Creative content types
+        "poetry", "short_story", "song_lyrics", "screenplay", "philosophical_essay",
+        # Technical content types
+        "code", "api_documentation", "database_schema", "system_logs", "scientific_paper",
+        # Hybrid content types
+        "interview_transcript", "product_review", "tutorial", "case_study",
+        # Traditional content types
+        "text", "data", "configuration", "documentation"
+    }
     invalid_types = set(config.content_types) - valid_content_types
     if invalid_types:
-        issues.append(f"Invalid content types: {', '.join(invalid_types)}. Valid types: {', '.join(valid_content_types)}")
+        issues.append(f"Invalid content types: {', '.join(invalid_types)}. Valid types: {', '.join(sorted(valid_content_types))}")
     
     return issues
 
 
 @dataclass
 class BenchmarkConfig:
-    """Configuration for the benchmark run"""
+    """Configuration for the benchmark run with enhanced content type support"""
     # Default base URLs
     base_url: str = "http://localhost:1234/v1"
     creative_base_url: str = ""  # If empty, uses base_url
@@ -87,6 +96,9 @@ class BenchmarkConfig:
     
     # API configuration
     api_key: str = "not-needed"
+    creative_api_key: str = ""  # If empty, uses api_key
+    verification_api_key: str = ""  # If empty, uses api_key
+    transform_api_key: str = ""  # If empty, uses api_key
     temperature: float = 0.3
     
     # Individual temperature settings
@@ -118,7 +130,13 @@ class BenchmarkConfig:
     
     def __post_init__(self):
         if self.content_types is None:
-            self.content_types = ["code", "text", "data", "configuration", "documentation"]
+            # Enhanced default content types spanning creative to technical spectrum
+            self.content_types = [
+                # Mix of creative and technical for diverse testing
+                "code", "text", "data", "configuration", "documentation",  # Traditional types
+                "poetry", "short_story", "tutorial", "case_study",  # Creative/hybrid types
+                "api_documentation", "interview_transcript"  # Technical/hybrid types
+            ]
         
         # Set default base URLs if not specified
         if not self.creative_base_url:
@@ -127,6 +145,14 @@ class BenchmarkConfig:
             self.verification_base_url = self.base_url
         if not self.transform_base_url:
             self.transform_base_url = self.base_url
+        
+        # Set default API keys if not specified
+        if not self.creative_api_key:
+            self.creative_api_key = self.api_key
+        if not self.verification_api_key:
+            self.verification_api_key = self.api_key
+        if not self.transform_api_key:
+            self.transform_api_key = self.api_key
 
 
 @dataclass
